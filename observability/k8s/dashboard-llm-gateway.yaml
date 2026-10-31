@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-llm-gateway
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"          # der Grafana-Sidecar sucht genau dieses Label
+data:
+  llm-gateway.json: |
+    {
+      "uid": "llm-gateway",
+      "title": "LLM Gateway",
+      "schemaVersion": 39,
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "30s",
+      "annotations": { "list": [ {
+        "name": "Deployments", "enable": true, "iconColor": "orange",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr":
+    "changes(kube_deployment_metadata_generation{namespace=\"llm-system\"}[2m]) > 0",
+        "titleFormat": "Deploy {{deployment}}", "step": "1m"
+      } ] },
+      "templating": { "list": [ {
+        "name": "tenant", "type": "query", "multi": true, "includeAll": true,
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(gateway_requests_total, tenant)"
+      } ] },
+      "panels": [
+        { "type": "timeseries", "title": "Anfragen/s pro Mandant",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "legendFormat": "{{tenant}}",
+            "expr": "tenant:gateway_requests:rate5m{tenant=~\"$tenant\"}" } ] },
+        { "type": "timeseries", "title": "5xx-Quote",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "percentunit" } },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "legendFormat": "{{tenant}}",
+            "expr": "tenant:gateway_request_errors:ratio_rate5m{tenant=~\"$tenant\"}"
+          } ] },
+        { "type": "timeseries", "title": "p95-Latenz",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "legendFormat": "{{tenant}}",
+            "expr":
+              "tenant:gateway_request_duration_seconds:p95_5m{tenant=~\"$tenant\"}"
+          } ] },
+        { "type": "timeseries", "title": "Tokens/s",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "legendFormat": "{{tenant}} {{type}}",
+            "expr": "tenant_type:gateway_tokens:rate5m{tenant=~\"$tenant\"}" } ] }
+      ]
+    }

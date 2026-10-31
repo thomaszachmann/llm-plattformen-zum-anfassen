@@ -1,0 +1,11 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: llm-vm
+  namespace: monitoring
+spec:
+  staticConfigs:
+    - targets: ["LLM_VM_IP:9100"]       # wird per sed ersetzt
+      labels:
+        host: llm-vm
+        role: model-server

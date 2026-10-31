@@ -1,0 +1,44 @@
+# Tag 10: Alertmanager-Routing für die LLM-Plattform (Lab-Empfänger = Webhooks)
+global:
+  resolve_timeout: 5m
+route:
+  receiver: ticket                       # greift, wenn keine Route passt
+  group_by: [alertname, tenant]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [alertname = "Watchdog"]  # Dead Man's Switch der kps-Defaults
+      receiver: deadmans-switch
+      group_interval: 1m
+      repeat_interval: 1m                # Heartbeat jede Minute
+    - matchers: [alertname = "InfoInhibitor"]
+      receiver: "null"
+    - matchers: [tenant = "acme"]        # Premium-Kunde: CSM-Team zusätzlich
+      receiver: csm-acme
+      continue: true                     # weiter zu den nächsten Routen
+    - matchers: [severity = "page"]
+      receiver: pager
+      repeat_interval: 1h
+    - receiver: ticket                   # Rest (auch nach continue) -> Ticket
+receivers:
+  - name: "null"
+  - name: ticket
+    webhook_configs:
+      - url: http://alert-sink.monitoring.svc:8080/ticket
+  - name: pager
+    webhook_configs:
+      - url: http://alert-sink.monitoring.svc:8080/page
+  - name: csm-acme
+    webhook_configs:
+      - url: http://alert-sink.monitoring.svc:8080/csm-acme
+  - name: deadmans-switch
+    webhook_configs:
+      - url: http://alert-sink.monitoring.svc:8080/heartbeat
+inhibit_rules:
+  - source_matchers: [severity = "page"]     # Page unterdrückt Ticket
+    target_matchers: [severity = "ticket"]
+    equal: [tenant]
+  - source_matchers: [alertname = "LLMGatewayDown"]
+    target_matchers: [alertname =~ "LLMGateway.+", alertname != "LLMGatewayDown"]
+    equal: [namespace]

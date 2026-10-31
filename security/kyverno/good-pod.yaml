@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gw-good
+  namespace: llm-system
+spec:
+  containers:
+    - name: gw
+      image: localhost:5055/llm-gateway:dev
+      resources:
+        requests: {cpu: 100m, memory: 64Mi}
+        limits: {memory: 128Mi}

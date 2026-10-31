@@ -1,0 +1,26 @@
+# Lab-Policy (Tag 13): festes Image-Tag und Ressourcen für alle Pods
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: pod-guardrails
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - message: "Image braucht einen festen Tag oder Digest, nicht :latest."
+      expression: >-
+        object.spec.containers.all(c,
+          c.image.contains("@sha256:") ||
+          (c.image.split("/")[c.image.split("/").size() - 1].contains(":") &&
+           !c.image.endsWith(":latest")))
+    - message: "CPU/Memory-Requests und ein Memory-Limit sind Pflicht."
+      expression: >-
+        object.spec.containers.all(c, has(c.resources) &&
+          has(c.resources.requests) && "cpu" in c.resources.requests &&
+          "memory" in c.resources.requests &&
+          has(c.resources.limits) && "memory" in c.resources.limits)

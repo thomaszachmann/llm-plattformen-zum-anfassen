@@ -1,0 +1,10 @@
+llm-platform {{ .Chart.Version }} (Release {{ .Release.Name }}) installiert.
+
+Test:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "llm-platform.fullname" . }}-gateway 8080:{{ .Values.gateway.service.port }}
+  curl -s localhost:8080/v1/models -H "Authorization: Bearer <tenant-key>"
+
+Modelle: {{ join ", " .Values.modelServer.models }}
+{{- if and .Values.modelServer.pullOnStart (not .Values.modelServer.modelImage.repository) }}
+WARNUNG: pullOnStart=true lädt Modelle aus dem Internet – im Air-Gap modelImage setzen.
+{{- end }}

@@ -1,0 +1,13 @@
+llm_vm_ollama_version: "0.40.2"
+llm_vm_ollama_skip_install: false        # nur für Container-Tests: Binary nicht laden
+llm_vm_ollama_listen: "0.0.0.0:11434"
+llm_vm_ollama_models_dir: /var/lib/ollama/models
+llm_vm_ollama_keep_alive: "30m"
+llm_vm_ollama_memory_max: "6G"           # systemd MemoryMax: OOM trifft nur Ollama
+llm_vm_ollama_cpu_quota: "300%"          # 3 von 4 vCPUs
+llm_vm_ollama_nofile: 65536
+llm_vm_ollama_models:
+  - ministral-3:3b
+llm_vm_gateway_cidr: "10.0.0.0/24"       # nur von hier ist 11434 erreichbar
+llm_vm_monitoring_cidr: "{{ llm_vm_gateway_cidr }}"
+llm_vm_ssh_cidr: "0.0.0.0/0"

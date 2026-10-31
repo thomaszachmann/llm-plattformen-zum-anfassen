@@ -1,0 +1,123 @@
+# promtool test rules llm-gateway.test.yaml
+rule_files:
+  - llm-gateway-recording.rules.yaml
+  - llm-gateway-slo.rules.yaml
+  - llm-gateway-alerts.rules.yaml
+evaluation_interval: 30s
+tests:
+  - interval: 1m
+    input_series:
+      # acme: 7 rps ok, 1 rps 5xx, 2 rps 429 -> SLI-Fehlerquote 1/8 = 12,5 %
+      - series: 'gateway_requests_total{tenant="acme",code="200"}'
+        values: '0+420x240'
+      - series: 'gateway_requests_total{tenant="acme",code="502"}'
+        values: '0+60x240'
+      - series: 'gateway_requests_total{tenant="acme",code="429"}'
+        values: '0+120x240'
+      - series: 'gateway_ratelimited_total{tenant="acme"}'
+        values: '0+120x240'
+      # globex: 2 % Fehler -> langsamer Burn (nur Ticket)
+      - series: 'gateway_requests_total{tenant="globex",code="200"}'
+        values: '0+588x240'
+      - series: 'gateway_requests_total{tenant="globex",code="500"}'
+        values: '0+12x240'
+      # initech: keine Fehler -> Quote 0 statt "keine Daten"
+      - series: 'gateway_requests_total{tenant="initech",code="200"}'
+        values: '0+600x240'
+      # Latenz-Histogramm acme: 50 % <= 0,5 s, 95 % <= 1 s, 100 % <= 2 s
+      - series: 'gateway_request_duration_seconds_bucket{tenant="acme",le="0.5"}'
+        values: '0+30x240'
+      - series: 'gateway_request_duration_seconds_bucket{tenant="acme",le="1"}'
+        values: '0+57x240'
+      - series: 'gateway_request_duration_seconds_bucket{tenant="acme",le="2"}'
+        values: '0+60x240'
+      - series: 'gateway_request_duration_seconds_bucket{tenant="acme",le="+Inf"}'
+        values: '0+60x240'
+      - series: 'gateway_tokens_total{tenant="acme",type="completion"}'
+        values: '0+3000x240'
+      # Gateway-Pod: 60 min gescrapt, danach down
+      - series: 'up{job="llm-gateway",instance="10.244.1.7:8080"}'
+        values: '1x60 0x180'
+    promql_expr_test:
+      - expr: tenant:gateway_requests:rate5m{tenant="acme"}
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant:gateway_requests:rate5m{tenant="acme"}'
+            value: 10
+      - expr: tenant:gateway_request_errors:ratio_rate5m{tenant="acme"}
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant:gateway_request_errors:ratio_rate5m{tenant="acme"}'
+            value: 0.1
+      - expr: tenant:gateway_ratelimited:ratio_rate5m
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant:gateway_ratelimited:ratio_rate5m{tenant="acme"}'
+            value: 0.2
+      - expr: tenant:gateway_request_duration_seconds:p95_5m
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant:gateway_request_duration_seconds:p95_5m{tenant="acme"}'
+            value: 1
+      - expr: tenant_type:gateway_tokens:rate5m
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant_type:gateway_tokens:rate5m{tenant="acme",type="completion"}'
+            value: 50
+      - expr: tenant:slo_errors:ratio_rate1h
+        eval_time: 2h
+        exp_samples:
+          - labels: 'tenant:slo_errors:ratio_rate1h{tenant="acme"}'
+            value: 0.125
+          - labels: 'tenant:slo_errors:ratio_rate1h{tenant="globex"}'
+            value: 0.02
+          - labels: 'tenant:slo_errors:ratio_rate1h{tenant="initech"}'
+            value: 0
+    alert_rule_test:
+      - eval_time: 30m      # 1h-Fenster schon über Schwelle, Alert feuert
+        alertname: LLMGatewayHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page, long_window: 1h, tenant: acme }
+            exp_annotations:
+              summary: "llm-gateway: hohe 5xx-Quote für Mandant acme"
+              description: >-
+                12.5% Fehler. Bei diesem Tempo ist das
+                28-Tage-Fehlerbudget in wenigen Tagen aufgebraucht.
+              runbook_url: >-
+                https://runbooks.example.com/llm-gateway/LLMGatewayHighErrorRate
+              dashboard_url: https://grafana.example.com/d/llm-gateway
+          - exp_labels: { severity: page, long_window: 6h, tenant: acme }
+            exp_annotations:
+              summary: "llm-gateway: hohe 5xx-Quote für Mandant acme"
+              description: >-
+                12.5% Fehler. Bei diesem Tempo ist das
+                28-Tage-Fehlerbudget in wenigen Tagen aufgebraucht.
+              runbook_url: >-
+                https://runbooks.example.com/llm-gateway/LLMGatewayHighErrorRate
+              dashboard_url: https://grafana.example.com/d/llm-gateway
+      - eval_time: 2h       # globex brennt langsam: Ticket, kein Page
+        alertname: LLMGatewayErrorBudgetBurn
+        exp_alerts:
+          - exp_labels: { severity: ticket, tenant: acme }
+            exp_annotations:
+              summary: "llm-gateway: Fehlerbudget von acme schmilzt"
+              runbook_url: >-
+                https://runbooks.example.com/llm-gateway/LLMGatewayErrorBudgetBurn
+          - exp_labels: { severity: ticket, tenant: globex }
+            exp_annotations:
+              summary: "llm-gateway: Fehlerbudget von globex schmilzt"
+              runbook_url: >-
+                https://runbooks.example.com/llm-gateway/LLMGatewayErrorBudgetBurn
+      - eval_time: 1m       # for: 2m noch nicht erfüllt -> noch kein Alert
+        alertname: LLMGatewayHighErrorRate
+        exp_alerts: []
+      - eval_time: 63m      # erst 3 min down, for: 2m erfüllt
+        alertname: LLMGatewayDown
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: llm-gateway
+              instance: "10.244.1.7:8080"
+            exp_annotations:
+              summary: "llm-gateway 10.244.1.7:8080 wird nicht gescrapt"
+              runbook_url: https://runbooks.example.com/llm-gateway/LLMGatewayDown

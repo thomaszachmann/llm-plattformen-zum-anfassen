@@ -1,0 +1,62 @@
+{{- $fn := include "llm-platform.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fn }}-gateway
+  labels:
+    {{- include "llm-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "llm-platform.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/name: llm-gateway  # NetworkPolicies (Tag 6/7), ServiceMonitor (Tag 8)
+      annotations:
+        checksum/tenants: {{ toJson .Values.gateway.tenants | sha256sum | trunc 16 }}
+    spec:
+      {{- include "llm-platform.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: {{ include "llm-platform.image" (dict "img" .Values.gateway.image "global" .Values.global) }}
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: UPSTREAM_URL
+              value: "http://{{ $fn }}-model:11434"
+            - name: RATE_LIMIT_RPS
+              value: {{ .Values.gateway.rateLimit.rps | quote }}
+            - name: RATE_LIMIT_BURST
+              value: {{ .Values.gateway.rateLimit.burst | quote }}
+            - name: TENANT_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llm-platform.secretName" . }}
+                  key: TENANT_KEYS
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

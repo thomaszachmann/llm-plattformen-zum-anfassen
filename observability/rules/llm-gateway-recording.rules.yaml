@@ -1,0 +1,23 @@
+# Tag 8: Recording Rules für das llm-gateway (Namensschema level:metric:operations)
+groups:
+  - name: llm-gateway.recording
+    interval: 30s
+    rules:
+      - record: tenant:gateway_requests:rate5m
+        expr: sum by (tenant) (rate(gateway_requests_total[5m]))
+      - record: tenant:gateway_request_errors:ratio_rate5m
+        expr: |
+          sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[5m]))
+          /
+          sum by (tenant) (rate(gateway_requests_total[5m]))
+      - record: tenant:gateway_request_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (tenant, le) (rate(gateway_request_duration_seconds_bucket[5m])))
+      - record: tenant_type:gateway_tokens:rate5m
+        expr: sum by (tenant, type) (rate(gateway_tokens_total[5m]))
+      - record: tenant:gateway_ratelimited:ratio_rate5m
+        expr: |
+          sum by (tenant) (rate(gateway_ratelimited_total[5m]))
+          /
+          sum by (tenant) (rate(gateway_requests_total[5m]))

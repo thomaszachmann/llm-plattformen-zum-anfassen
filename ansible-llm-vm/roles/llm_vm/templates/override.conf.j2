@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+[Service]
+Environment="OLLAMA_HOST={{ llm_vm_ollama_listen }}"
+Environment="OLLAMA_MODELS={{ llm_vm_ollama_models_dir }}"
+Environment="OLLAMA_KEEP_ALIVE={{ llm_vm_ollama_keep_alive }}"
+MemoryMax={{ llm_vm_ollama_memory_max }}
+CPUQuota={{ llm_vm_ollama_cpu_quota }}
+LimitNOFILE={{ llm_vm_ollama_nofile }}

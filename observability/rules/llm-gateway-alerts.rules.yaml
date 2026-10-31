@@ -1,0 +1,54 @@
+# Tag 10: Multi-Window-Multi-Burn-Rate-Alerts (Google SRE Workbook, Kap. 5)
+# 14.4x und 6x -> page, 3x und 1x -> ticket. Budget: 0.005 (SLO 99,5 %).
+groups:
+  - name: llm-gateway.slo.alerts
+    rules:
+      - alert: LLMGatewayHighErrorRate
+        expr: |
+          tenant:slo_errors:ratio_rate1h > (14.4 * 0.005)
+          and tenant:slo_errors:ratio_rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: { severity: page, long_window: 1h }
+        annotations: &page
+          summary: "llm-gateway: hohe 5xx-Quote für Mandant {{ $labels.tenant }}"
+          description: >-
+            {{ $value | humanizePercentage }} Fehler. Bei diesem Tempo ist das
+            28-Tage-Fehlerbudget in wenigen Tagen aufgebraucht.
+          runbook_url: >-
+            https://runbooks.example.com/llm-gateway/LLMGatewayHighErrorRate
+          dashboard_url: https://grafana.example.com/d/llm-gateway
+      - alert: LLMGatewayHighErrorRate
+        expr: |
+          tenant:slo_errors:ratio_rate6h > (6 * 0.005)
+          and tenant:slo_errors:ratio_rate30m > (6 * 0.005)
+        for: 5m
+        labels: { severity: page, long_window: 6h }
+        annotations: *page
+      - alert: LLMGatewayErrorBudgetBurn
+        expr: |
+          (tenant:slo_errors:ratio_rate1d > (3 * 0.005)
+           and tenant:slo_errors:ratio_rate2h > (3 * 0.005))
+          or
+          (tenant:slo_errors:ratio_rate3d > (1 * 0.005)
+           and tenant:slo_errors:ratio_rate6h > (1 * 0.005))
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "llm-gateway: Fehlerbudget von {{ $labels.tenant }} schmilzt"
+          runbook_url: >-
+            https://runbooks.example.com/llm-gateway/LLMGatewayErrorBudgetBurn
+      - alert: LLMGatewayDown
+        expr: up{job="llm-gateway"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "llm-gateway {{ $labels.instance }} wird nicht gescrapt"
+          runbook_url: https://runbooks.example.com/llm-gateway/LLMGatewayDown
+      - alert: LLMGatewayHighLatency
+        expr: tenant:gateway_request_duration_seconds:p95_5m > 20
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "llm-gateway: p95 über 20 s für {{ $labels.tenant }}"
+          runbook_url: >-
+            https://runbooks.example.com/llm-gateway/LLMGatewayHighLatency

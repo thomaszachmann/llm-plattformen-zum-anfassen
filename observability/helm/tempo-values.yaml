@@ -1,0 +1,15 @@
+# Tempo monolithisch (ein Pod), lokaler Storage; OTLP auf 4317 (gRPC) und 4318 (HTTP)
+tempo:
+  reportingEnabled: false
+  retention: 24h
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 1Gi }
+  receivers:
+    otlp:
+      protocols:
+        grpc: { endpoint: "0.0.0.0:4317" }
+        http: { endpoint: "0.0.0.0:4318" }
+persistence:
+  enabled: true
+  size: 5Gi

@@ -1,0 +1,43 @@
+# kube-prometheus-stack für kind: klein, kurze Retention, nur nötige Komponenten
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    retentionSize: 2GB
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    # auch ServiceMonitors/Regeln ohne Label release=kps auswählen
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+      limits: { memory: 1Gi }
+alertmanager:
+  alertmanagerSpec:
+    retention: 24h
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+grafana:
+  adminPassword: lab-admin        # Lab-Wert, nie in Produktion
+  defaultDashboardsTimezone: browser
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+# kind betreibt diese Komponenten nur auf localhost -> Targets wären "down"
+kubeEtcd: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false

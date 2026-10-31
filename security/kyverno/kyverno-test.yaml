@@ -1,0 +1,15 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-guardrails
+policies: [pod-guardrails.yaml]
+resources: [good-pod.yaml, bad-pod.yaml]
+results:
+  - policy: pod-guardrails
+    kind: Pod
+    resources: [gw-good]
+    result: pass
+  - policy: pod-guardrails
+    kind: Pod
+    resources: [gw-latest, gw-nolimits]
+    result: fail

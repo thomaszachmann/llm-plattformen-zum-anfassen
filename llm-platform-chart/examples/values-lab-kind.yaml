@@ -1,0 +1,16 @@
+# Offline-Drill im kind-Cluster sre-lab (Tag 14): alles aus kunde-registry:5000
+global:
+  imageRegistry: kunde-registry:5000
+gateway:
+  replicas: 1
+modelServer:
+  pullOnStart: false
+  modelImage:
+    repository: models/ministral-3
+    tag: 3b-q4km
+  numParallel: 1
+  persistence:
+    size: 10Gi
+  resources:
+    requests: {cpu: 500m, memory: 3Gi}
+    limits: {memory: 4Gi}

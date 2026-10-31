@@ -1,0 +1,17 @@
+# Kunde ACME, Air-Gap, CPU-only. Secret "acme-tenant-keys" legt der Kunde an.
+global:
+  imageRegistry: registry.acme.internal:5000
+  imagePullSecrets: [acme-registry]
+gateway:
+  replicas: 3
+  existingSecret: acme-tenant-keys
+  tenants: {}
+  rateLimit: {rps: 20, burst: 40}
+modelServer:
+  pullOnStart: false
+  modelImage:
+    repository: models/ministral-3
+    tag: 3b-q4km
+  persistence:
+    size: 30Gi
+    storageClass: ceph-rbd

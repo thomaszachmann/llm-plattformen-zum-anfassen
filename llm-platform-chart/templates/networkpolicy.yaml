@@ -1,0 +1,23 @@
+{{- if .Values.networkPolicy.enabled }}
+# Modellserver nur vom Gateway derselben Release erreichbar
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "llm-platform.fullname" . }}-model
+  labels:
+    {{- include "llm-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: model
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: gateway
+      ports:
+        - port: 11434
+{{- end }}

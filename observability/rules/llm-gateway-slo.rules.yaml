@@ -1,0 +1,42 @@
+# Tag 10: SLO "Verfügbarkeit 99,5 % / 28 Tage" für das llm-gateway, pro Mandant.
+# SLI = Anteil 5xx an allen Anfragen ohne 4xx (401/429 sind Fehler des Clients).
+# Fehlerbudget = 1 - 0.995 = 0.005. Burn Rate 1 = Budget ist nach 28 Tagen leer.
+groups:
+  - name: llm-gateway.slo.recording
+    interval: 30s
+    rules:
+      - record: tenant:slo_errors:ratio_rate5m
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[5m]))
+            or sum by (tenant) (rate(gateway_requests_total[5m])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[5m]))
+      - record: tenant:slo_errors:ratio_rate30m
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[30m]))
+            or sum by (tenant) (rate(gateway_requests_total[30m])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[30m]))
+      - record: tenant:slo_errors:ratio_rate1h
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[1h]))
+            or sum by (tenant) (rate(gateway_requests_total[1h])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[1h]))
+      - record: tenant:slo_errors:ratio_rate2h
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[2h]))
+            or sum by (tenant) (rate(gateway_requests_total[2h])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[2h]))
+      - record: tenant:slo_errors:ratio_rate6h
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[6h]))
+            or sum by (tenant) (rate(gateway_requests_total[6h])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[6h]))
+      - record: tenant:slo_errors:ratio_rate1d
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[1d]))
+            or sum by (tenant) (rate(gateway_requests_total[1d])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[1d]))
+      - record: tenant:slo_errors:ratio_rate3d
+        expr: |
+          (sum by (tenant) (rate(gateway_requests_total{code=~"5.."}[3d]))
+            or sum by (tenant) (rate(gateway_requests_total[3d])) * 0)
+          / sum by (tenant) (rate(gateway_requests_total{code!~"4.."}[3d]))

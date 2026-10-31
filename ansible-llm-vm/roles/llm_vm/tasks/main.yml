@@ -1,0 +1,117 @@
+- name: Pakete installieren
+  ansible.builtin.apt:
+    name: [curl, ca-certificates, zstd, ufw, prometheus-node-exporter]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Systemgruppe ollama
+  ansible.builtin.group:
+    name: ollama
+    system: true
+
+- name: Systemuser ollama
+  ansible.builtin.user:
+    name: ollama
+    group: ollama
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/ollama
+    create_home: false
+
+- name: Modellverzeichnis
+  ansible.builtin.file:
+    path: "{{ llm_vm_ollama_models_dir }}"
+    state: directory
+    owner: ollama
+    group: ollama
+    mode: "0750"
+
+- name: Ollama-Binary installieren (offizielles Skript, versioniert)
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://ollama.com/install.sh | sh
+    executable: /bin/bash
+    creates: /usr/local/bin/ollama
+  environment:
+    OLLAMA_VERSION: "{{ llm_vm_ollama_version }}"
+  when: not llm_vm_ollama_skip_install | bool
+  tags: [ollama_install]
+
+- name: Systemd-Unit
+  ansible.builtin.template:
+    src: ollama.service.j2
+    dest: /etc/systemd/system/ollama.service
+    mode: "0644"
+  notify: Restart ollama
+
+- name: Drop-in-Verzeichnis
+  ansible.builtin.file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    mode: "0755"
+
+- name: Drop-in mit Limits und Umgebung
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    mode: "0644"
+  notify: Restart ollama
+
+- name: Ollama aktiv
+  ansible.builtin.systemd_service:
+    name: ollama
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Node-Exporter aktiv
+  ansible.builtin.systemd_service:
+    name: prometheus-node-exporter
+    enabled: true
+    state: started
+
+- name: Handler jetzt ausführen (Modelle brauchen laufenden Server)
+  ansible.builtin.meta: flush_handlers
+
+- name: Modelle vorhanden?
+  ansible.builtin.command: ollama show {{ item }}
+  loop: "{{ llm_vm_ollama_models }}"
+  register: llm_vm_model_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fehlende Modelle laden
+  ansible.builtin.command: ollama pull {{ item.item }}
+  loop: "{{ llm_vm_model_check.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.rc != 0
+  changed_when: true
+
+- name: UFW – SSH erlauben (vor dem Aktivieren!)
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    from_ip: "{{ llm_vm_ssh_cidr }}"
+
+- name: UFW – Ollama nur vom Gateway
+  community.general.ufw:
+    rule: allow
+    port: "11434"
+    proto: tcp
+    from_ip: "{{ llm_vm_gateway_cidr }}"
+
+- name: UFW – node_exporter nur vom Monitoring
+  community.general.ufw:
+    rule: allow
+    port: "9100"
+    proto: tcp
+    from_ip: "{{ llm_vm_monitoring_cidr }}"
+
+- name: UFW – Default deny, aktivieren
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming

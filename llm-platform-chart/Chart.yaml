@@ -1,0 +1,9 @@
+apiVersion: v2
+name: llm-platform
+description: LLM-Gateway (mandantenfähig) plus Ollama-Modellserver für Kunden-Deployments
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [llm, mistral, ollama, gateway]
+maintainers:
+  - name: Thomas Zachmann

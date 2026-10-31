@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gw-latest
+  namespace: llm-system
+spec:
+  containers:
+    - name: gw
+      image: localhost:5055/llm-gateway:latest
+      resources:
+        requests: {cpu: 100m, memory: 64Mi}
+        limits: {memory: 128Mi}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gw-nolimits
+  namespace: llm-system
+spec:
+  containers:
+    - name: gw
+      image: localhost:5055/llm-gateway:dev

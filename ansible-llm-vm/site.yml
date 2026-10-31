@@ -1,0 +1,5 @@
+- name: LLM-VM bereitstellen
+  hosts: llm_vms
+  become: true
+  roles:
+    - llm_vm

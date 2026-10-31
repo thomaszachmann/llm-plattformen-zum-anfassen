@@ -1,0 +1,31 @@
+# Tag 9: Loki und Tempo als Grafana-Datenquellen, verknüpft in beide Richtungen
+grafana:
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.monitoring.svc:3100
+      access: proxy
+      jsonData:
+        derivedFields:                    # Log -> Trace
+          - name: TraceID
+            matcherRegex: '"trace_id":"(\w+)"'
+            datasourceUid: tempo
+            url: "$${__value.raw}"        # $$ = wörtliches $ im Provisioning
+            urlDisplayLabel: Trace öffnen
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      url: http://tempo.monitoring.svc:3200
+      access: proxy
+      jsonData:
+        tracesToLogsV2:                   # Trace -> Logs
+          datasourceUid: loki
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          customQuery: true
+          query: '{namespace="llm-system"} |= "$${__trace.traceId}"'
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true

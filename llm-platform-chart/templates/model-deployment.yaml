@@ -1,0 +1,117 @@
+{{- $fn := include "llm-platform.fullname" . -}}
+{{- $m := .Values.modelServer -}}
+{{- $ollama := include "llm-platform.image" (dict "img" $m.image "global" .Values.global) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fn }}-model
+  labels:
+    {{- include "llm-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # RWO-Volume: alter Pod muss erst weg
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: model
+  template:
+    metadata:
+      labels:
+        {{- include "llm-platform.labels" . | nindent 8 }}
+        app.kubernetes.io/component: model
+    spec:
+      {{- include "llm-platform.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with $m.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $m.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      {{- if $m.modelImage.repository }}
+        - name: copy-models
+          image: {{ include "llm-platform.image" (dict "img" $m.modelImage "global" .Values.global) }}
+          command: ["sh", "-c", "mkdir -p /data/models && cp -Rn /models/* /data/models/"]
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      {{- else if $m.pullOnStart }}
+        - name: pull-models
+          image: {{ $ollama }}
+          command:
+            - sh
+            - -c
+            - |
+              ollama serve & pid=$!
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              for m in $MODELS; do ollama pull "$m" || exit 1; done
+              kill $pid
+          env:
+            - {name: HOME, value: /data}
+            - {name: OLLAMA_MODELS, value: /data/models}
+            - {name: MODELS, value: {{ join " " $m.models | quote }}}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      {{- else }}
+        []
+      {{- end }}
+      containers:
+        - name: ollama
+          image: {{ $ollama }}
+          imagePullPolicy: {{ $m.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 11434
+          env:
+            - {name: HOME, value: /data}
+            - {name: OLLAMA_HOST, value: "0.0.0.0:11434"}
+            - {name: OLLAMA_MODELS, value: /data/models}
+            - {name: OLLAMA_KEEP_ALIVE, value: {{ $m.keepAlive | quote }}}
+            - {name: OLLAMA_NUM_PARALLEL, value: {{ $m.numParallel | quote }}}
+            - {name: OLLAMA_CONTEXT_LENGTH, value: {{ $m.contextLength | quote }}}
+          livenessProbe:
+            httpGet: {path: /api/version, port: http}
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: {path: /api/tags, port: http}
+          resources:
+            requests:
+              {{- toYaml $m.resources.requests | nindent 14 }}
+            limits:
+              {{- toYaml $m.resources.limits | nindent 14 }}
+              {{- if $m.gpu.enabled }}
+              nvidia.com/gpu: {{ $m.gpu.count }}
+              {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: data
+          {{- if $m.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ $fn }}-models
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
