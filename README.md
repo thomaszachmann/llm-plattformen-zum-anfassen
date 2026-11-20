@@ -1,12 +1,12 @@
-# LLM-Plattformen zum Anfassen – Begleitcode
+# LLM platforms hands-on – Companion Code
 
-Begleitcode zum Buch **LLM-Plattformen zum Anfassen** – Site Reliability Engineering für Applied AI. Teil der Reihe IT-Trainingslager von Thomas Zachmann.
+Companion code for the book **LLM platforms hands-on** (German edition: *LLM-Plattformen zum Anfassen*) – site reliability engineering for applied AI. Part of Thomas Zachmann's IT Drills series.
 
-Buchseite: https://it-trainingslager.de/buecher/llm-plattformen
+Book page: https://itdrills.com/books/llm-plattformen · German edition: https://it-trainingslager.de/buecher/llm-plattformen
 
-Der Code begleitet das Buch; Erklärungen und Übungen stehen im Buch.
+The code accompanies the book; explanations and exercises are in the book.
 
-## Inhalt
+## Contents
 
 - `ansible-llm-vm/`
 - `llm-gateway/`
@@ -17,14 +17,14 @@ Der Code begleitet das Buch; Erklärungen und Übungen stehen im Buch.
 - `security/`
 - `tofu-tenant/`
 
-## Schnellstart
+## Quick start
 
 ```bash
 git clone https://github.com/thomaszachmann/llm-plattformen-zum-anfassen.git
 ```
 
-An Tag 0 kopierst du den Begleitcode nach `~/sre-lab/code` – Details stehen im Kapitel „Tag 0“ des Buchs.
+On Day 0 you copy the companion code to `~/sre-lab/code` – details are in the book's "Day 0" chapter.
 
-## Lizenz
+## License
 
-Code: MIT (siehe LICENSE). Buchtexte, Abbildungen und Cover sind nicht Teil dieses Repos und nicht lizenziert.
+Code: MIT (see LICENSE). Book text, figures and cover are not part of this repo and are not licensed.
